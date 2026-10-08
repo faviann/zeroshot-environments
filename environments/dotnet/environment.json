@@ -1,6 +1,6 @@
 {
-  "name": "dotnet",
-  "repository": "ghcr.io/faviann/zeroshot-environments/dotnet",
+  "environment": { "name": "dotnet" },
+  "image": { "repository": "ghcr.io/faviann/zeroshot-environments/dotnet" },
   "platform": "linux/amd64",
   "base": {
     "reference": "ghcr.io/the-open-engine/zeroshot-target:10.10.0@sha256:9769f74865d7e1137b82c9ed2ced4cbedb56cfd5fef6c9e8c0647955ba0c438b",
@@ -8,18 +8,12 @@
   },
   "native": {
     "version": "10.10.0",
-    "sourceRevision": "3ee1192cec359a0b997f464e703a936e8b67d63c",
     "zeroshot": { "path": "/usr/local/bin/zeroshot", "sha256": "fd5ffef2d825d9035b3956b0026911a22e2c1b56f7fa205dd00310cfe88aeff5" },
     "restic": { "path": "/usr/local/bin/restic", "version": "0.19.1", "sha256": "90ab22a5e731063c27590e704e8da2f4d9bae59a67899bd45d0904afc868a8cf" }
   },
   "integration": {
     "broodling-entrypoint": {
       "path": "/usr/local/bin/broodling-target",
-      "source": {
-        "repository": "https://github.com/faviann/broodling",
-        "revision": "4bd7abbe308f94ff401196921ef1891f6b414edc",
-        "path": "deployment/direct-target-entrypoint.sh"
-      },
       "sha256": "76c526fe8c51be094dbc48527c40181f5b0f23069996f3c4315c456a49107b79"
     }
   },
