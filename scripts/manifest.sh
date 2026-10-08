@@ -62,14 +62,19 @@ observed=$(jq -n \
     osPackages: ($packages | lines | map(split("\t") | {name: .[0], version: .[1], architecture: .[2]}))
   }')
 
-# Observed facts win the merge; every expected leaf (arrays compare whole) must equal its manifest value.
 manifest=$(jq -n --slurpfile expected "$dir/environment.json" --argjson observed "$observed" '
   {schema: "zeroshot-environment.manifest/v1", environment: {release: null}, image: {tag: null, digest: null}}
   * $expected[0] * $observed | .native.sourceRevision = .base.revision')
-problems=$(jq -r -n --slurpfile expected "$dir/environment.json" --argjson manifest "$manifest" '
+# Every declared leaf (arrays compare whole) must equal what the image shows, except the declarations
+# themselves: identity, the approved base revision, the paths that get measured, and transitions.
+problems=$(jq -r -n --slurpfile expected "$dir/environment.json" --argjson observed "$observed" '
   $expected[0] | (paths(type != "object") | select(all(.[]; type == "string"))) as $path
-  | select(($manifest | getpath($path)) != getpath($path))
-  | "\($path | map(tostring) | join(".")): image has \($manifest | getpath($path) | tojson), expected \(getpath($path) | tojson)"')
+  | select(($path | IN(["environment", "name"], ["image", "repository"], ["base", "revision"],
+      ["nativeStateTransitions", "from"])) or $path[-1] == "path" | not)
+  | ($path | join(".")) as $name | ($observed | try getpath($path) catch null) as $actual
+  | if $actual == null then "\($name): declared but not measured from the image"
+    elif $actual != getpath($path) then "\($name): image has \($actual | tojson), expected \(getpath($path) | tojson)"
+    else empty end')
 if jq -e '.nativeStateTransitions.from | length > 0' "$dir/environment.json" > /dev/null; then
   problems=${problems:+$problems$'\n'}"nativeStateTransitions.from: add transition qualification to qualify.sh before advertising a source"
 fi

@@ -95,9 +95,10 @@ change to the schema gets a new version. The fields are:
   qualified to serve.
 - **`qualification`:** the workflow run that qualified and published the image.
 
-[`environment.json`](environments/dotnet/environment.json) is the subset of the manifest that is
-declared and asserted. [`scripts/manifest.sh`](scripts/manifest.sh) records everything else from the
-image.
+[`environment.json`](environments/dotnet/environment.json) is the declared subset of the manifest.
+[`scripts/manifest.sh`](scripts/manifest.sh) asserts each declared value against the image, except
+the identity, the approved base revision, the measured paths and the transitions. It records
+everything else from the image.
 
 ## Qualification
 
