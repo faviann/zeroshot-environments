@@ -19,19 +19,10 @@ moved. Select an image by the digest in its manifest, not by its tag.
 
 ## The `dotnet` environment
 
-The image is built on upstream's published target image for stock native 10.10.0. The base is used
-as published, pinned by digest, and not rebuilt. Its contents are recorded by inspecting the built
-image. The image adds:
-
-- .NET SDK 10.0.401, with ASP.NET Core and .NET runtimes 10.0.12, in `/usr/share/dotnet`. It is
-  registered in `/etc/dotnet/install_location`, and `libicu76` is added for globalization.
-- Broodling's target entrypoint at `/usr/local/bin/broodling-target`, from Broodling commit
-  [`4bd7abb`](https://github.com/faviann/broodling/blob/4bd7abbe308f94ff401196921ef1891f6b414edc/deployment/direct-target-entrypoint.sh),
-  verified by SHA-256. It replaces the base's entrypoint and command.
-
-The image keeps everything the base ships, as shipped: Codex, Claude Code and Copilot CLI, Node 24,
-Python 3.12, Rust 1.97, a C toolchain, git, gh and the Docker CLI. The manifest lists them. Having a
-tool installed authorizes nothing. No Docker socket or daemon is provided.
+The image is built on upstream's published target image for stock native 10.10.0, used as published
+and pinned by digest. It adds the .NET SDK and Broodling's target entrypoint, which replaces the
+base's entrypoint and command. Everything the base ships stays as shipped and is listed in the
+manifest. Having a tool installed authorizes nothing. No Docker socket or daemon is provided.
 
 Broodling's build and test prerequisites are a .NET 10 SDK, git, `cc` with libc headers, and
 `python3` for its asset check. Package-read and other runtime credentials come through the
@@ -91,8 +82,7 @@ change to the schema gets a new version. The fields are:
 - **`image`:** the `repository`, `tag` and the `digest` that the publishing push produced.
 - **`recipe`:** this repository, the `revision` built and the recipe `path`.
 - **`platform`, `os`:** the target platform and the OS release.
-- **`base`:** the pinned `reference` and its `revision` label. `layersArePrefix` confirms that the
-  image is built on exactly those layers.
+- **`base`:** the pinned `reference` and its `revision` label.
 - **`native`:** the `version`, the `sourceRevision`, and the path and SHA-256 of `zeroshot` and of
   `restic`, plus restic's `version`.
 - **`integration`:** each integration input, with its path, source (repository, commit, path) and
@@ -100,62 +90,36 @@ change to the schema gets a new version. The fields are:
 - **`dotnet`:** the installed `sdks` and `runtimes`.
 - **`harnesses`:** the `codex`, `claude` and `copilot` versions.
 - **`tools`:** node, python, rust, gcc, git, gh and docker-cli, as each reports its version.
-- **`imageAdjustments`:** the deviations from the base.
 - **`osPackages`:** every installed Debian package, read from dpkg (name, version, architecture).
 - **`nativeStateTransitions.from`:** the published images whose native state this release was
   qualified to serve.
 - **`qualification`:** the workflow run that qualified and published the image.
 
-[`scripts/manifest.sh`](scripts/manifest.sh) reads every fact from the built image. It fails if any
-pinned or approved fact differs from [`environment.json`](environments/dotnet/environment.json): the
-platform, base layers and revision, native and restic versions and checksums, the entrypoint
-checksum, the .NET SDKs and runtimes, and the harness versions. The OS package list is recorded, not
-asserted.
+[`environment.json`](environments/dotnet/environment.json) is the subset of the manifest that is
+declared and asserted. [`scripts/manifest.sh`](scripts/manifest.sh) records everything else from the
+image.
 
 ## Qualification
 
-[`scripts/qualify.sh`](scripts/qualify.sh) runs against disposable Docker volumes with no network,
-provider or real credential. It checks that:
+[`scripts/qualify.sh`](scripts/qualify.sh) checks the target's startup behaviour and the tools as
+agent UID 10002, with no network, provider or real credential. Restart is qualified only over the
+image's own fresh state. Before any image is listed in `nativeStateTransitions.from`, add
+transition checks like Broodling #125's: an update from that image's state to the new one. Broodling's
+adoption (#234) and repository validation (#236) separately establish SDK, workflow, build and test
+behaviour.
 
-- Initialization succeeds on empty state and home, and is refused over initialized state or a
-  nonempty home.
-- Startup is refused without a bootstrap key, with a `0644` key, and with another origin.
-- The target serves only in private mode: the key copy is unlinked, discovery advertises
-  `private_capability`, and an unauthenticated run request gets `401`.
-- The target restarts over its own state. It also serves the state of each image listed in
-  `nativeStateTransitions.from` (none yet). A transition is advertised only when that check passes.
-- As UID 10002, nothing outside the temporary directories is writable.
-- As UID 10002, on a read-only root filesystem, two runs with separate homes each build and run a
-  .NET console app, compile C, use git, python3, node, cargo and gh, and start each harness. Caches
-  land in each run's home.
-
-Broodling's adoption (#234) and repository validation (#236) separately establish SDK, workflow,
-build and test behaviour.
-
-## Build, check and publish
-
-Locally:
+## Build and publish
 
 ```bash
 docker build -t zeroshot-env-dotnet:local environments/dotnet
 scripts/manifest.sh zeroshot-env-dotnet:local environments/dotnet > manifest.json
-scripts/qualify.sh zeroshot-env-dotnet:local environments/dotnet
+scripts/qualify.sh zeroshot-env-dotnet:local
 ```
 
-The [workflow](.github/workflows/environments.yml) runs the same three steps on every pull request
-and push to `main`. To publish a release, push its tag, `git tag dotnet-r1 && git push origin
-dotnet-r1`. Do not create the GitHub release first: that creates the tag too, and the workflow's
-release creation then fails after the image is pushed.
-
-On a release tag, the workflow does the following:
-
-1. Builds, checks and qualifies the image.
-2. Refuses if the tag already exists in GHCR.
-3. Pushes the image and records the pushed digest in the manifest.
-4. Creates the GitHub release with `manifest.json` and `qualification.log`.
-
-If the run fails after the push, the tag is not a release and has no record. Publish a new `N`. The
-package is public. Visibility is a package setting, so check it after the first publication.
+To publish a release, push only its tag: `git tag dotnet-r1 && git push origin dotnet-r1`. If a
+GitHub release of that name exists already, the workflow refuses to publish. If a run fails after
+the push, the tag is not a release and has no record; publish a new `N`. The package is public.
+Visibility is a package setting, so check it after the first publication.
 
 ## Retention
 
