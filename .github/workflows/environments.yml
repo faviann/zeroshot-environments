@@ -1,0 +1,97 @@
+# Builds the environment image, records and checks its manifest, and qualifies it. A release tag
+# <environment>-r<N> (for example dotnet-r1) also publishes exactly the qualified image to GHCR under
+# that tag, never moving an existing one, and attaches its manifest and qualification log to a
+# GitHub release of the same name. Publication adopts and deploys nothing.
+name: Environments
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['dotnet-r*']
+
+permissions:
+  contents: read
+
+jobs:
+  dotnet:
+    runs-on: ubuntu-24.04
+    # One run per ref, so only one run can pass the publication existence check.
+    concurrency:
+      group: environments-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write  # the release, on a tag only
+      packages: write  # the image, on a tag only
+    env:
+      ENVIRONMENT: dotnet
+      IMAGE: zeroshot-environment:candidate
+      PUBLISH: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Determine the release
+        run: |
+          if [[ $PUBLISH == true ]]; then
+            [[ $GITHUB_REF_NAME =~ ^$ENVIRONMENT-r([1-9][0-9]*)$ ]] \
+              || { echo "::error::$GITHUB_REF_NAME is not a $ENVIRONMENT-r<N> release tag"; exit 1; }
+            echo "RELEASE=r${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
+          else
+            echo RELEASE=unreleased >> "$GITHUB_ENV"
+          fi
+
+      - name: Build
+        run: |
+          docker build --build-arg "RELEASE=$RELEASE" --build-arg "REVISION=$(git rev-parse HEAD)" \
+            --tag "$IMAGE" "environments/$ENVIRONMENT"
+
+      - name: Record and check the manifest
+        run: scripts/manifest.sh "$IMAGE" "environments/$ENVIRONMENT" > manifest.json
+
+      - name: Qualify
+        run: scripts/qualify.sh "$IMAGE" "environments/$ENVIRONMENT" | tee qualification.log
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.ENVIRONMENT }}-evidence
+          path: |
+            manifest.json
+            qualification.log
+          if-no-files-found: error
+
+      - name: Publish the image
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repository=$(jq -r .repository "environments/$ENVIRONMENT/environment.json")
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          # Published tags are never moved. Only the registry's own not-found means absent.
+          if found=$(docker buildx imagetools inspect "$repository:$RELEASE" 2>&1); then
+            echo "::error::$repository:$RELEASE is already published; it is never replaced." && exit 1
+          elif [[ $found != *"not found"* ]]; then
+            echo "::error::Cannot establish that $repository:$RELEASE is unpublished: $found" && exit 1
+          fi
+          docker tag "$IMAGE" "$repository:$RELEASE"
+          docker push --quiet "$repository:$RELEASE"
+          # The digest this push produced, not whatever the tag names by now.
+          reference=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" \
+            | grep --max-count 1 "^$repository@sha256:")
+          jq --arg release "$RELEASE" --arg digest "${reference#*@}" \
+            --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '.environment.release = $release | .image.tag = $release | .image.digest = $digest
+             | .qualification = {workflowRun: $run, log: "qualification.log"}' manifest.json > published.json
+          mv published.json manifest.json
+          cat manifest.json
+
+      - name: Attach the manifest and evidence to the release
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" manifest.json qualification.log --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Image $(jq -r '.image.repository + "@" + .image.digest' manifest.json). Publication adopts and deploys nothing; see manifest.json."
