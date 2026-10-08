@@ -49,7 +49,7 @@ serve() {
   docker rm -f -v "$container" > /dev/null
 }
 
-for volume in key state home; do docker volume create --label "$run" "$run-$volume" > /dev/null; done
+for volume in key state home tls-key tls-root; do docker volume create --label "$run" "$run-$volume" > /dev/null; done
 docker run --rm --label "$run" --network none --mount "src=$run-key,dst=/k" --entrypoint sh "$image" \
   -c "openssl rand -hex 32 | tr -d '\n' > /k/zeroshot-bootstrap-key && chmod 0400 /k/zeroshot-bootstrap-key"
 
@@ -61,6 +61,16 @@ refused 'initialization over initialized state' 'initialization requires empty s
 refused 'startup without a bootstrap key' 'missing bootstrap key' --no-key "${serve_args[@]}"
 refused 'startup with another origin' 'not bound to this public origin' \
   --listen 0.0.0.0:18770 --public-origin http://127.0.0.1:18771 --storage /state
+tls=(--mount "src=$run-tls-key,dst=/tls-root-key" --mount "src=$run-tls-root,dst=/tls-root")
+output=$(docker run --rm --label "$run" --network none "${tls[@]}" "$image" initialize-tls 2>&1) \
+  || fail "TLS root initialization: $output"
+[[ $output == *'TLS root created'* ]] || fail "TLS root initialization: $output"
+pass 'TLS root initialization on empty locations'
+if output=$(docker run --rm --label "$run" --network none "${tls[@]}" "$image" initialize-tls 2>&1); then
+  fail 'TLS root initialization over an existing root: accepted'
+fi
+[[ $output == *'an existing root is never replaced'* ]] || fail "TLS root initialization over an existing root: $output"
+pass 'TLS root initialization over an existing root refused'
 serve
 pass 'served privately: an unauthenticated run request is refused (401)'
 serve
