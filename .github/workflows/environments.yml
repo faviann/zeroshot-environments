@@ -13,31 +13,30 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash  # bash --noprofile --norc -eo pipefail: a failing qualify.sh fails its tee pipeline
+
 jobs:
   dotnet:
     runs-on: ubuntu-24.04
-    # One run per ref, so only one run can pass the publication existence check.
-    concurrency:
-      group: environments-${{ github.ref }}
-      cancel-in-progress: false
     permissions:
       contents: write  # the release, on a tag only
       packages: write  # the image, on a tag only
     env:
       ENVIRONMENT: dotnet
       IMAGE: zeroshot-environment:candidate
-      PUBLISH: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+      PUBLISH: ${{ github.ref_type == 'tag' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
 
       - name: Determine the release
         run: |
           if [[ $PUBLISH == true ]]; then
-            [[ $GITHUB_REF_NAME =~ ^$ENVIRONMENT-r([1-9][0-9]*)$ ]] \
-              || { echo "::error::$GITHUB_REF_NAME is not a $ENVIRONMENT-r<N> release tag"; exit 1; }
-            echo "RELEASE=r${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
+            echo "RELEASE=${GITHUB_REF_NAME#dotnet-}" >> "$GITHUB_ENV"
           else
             echo RELEASE=unreleased >> "$GITHUB_ENV"
           fi
@@ -51,7 +50,7 @@ jobs:
         run: scripts/manifest.sh "$IMAGE" "environments/$ENVIRONMENT" > manifest.json
 
       - name: Qualify
-        run: scripts/qualify.sh "$IMAGE" "environments/$ENVIRONMENT" | tee qualification.log
+        run: scripts/qualify.sh "$IMAGE" 2>&1 | tee qualification.log
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -69,11 +68,11 @@ jobs:
           set -euo pipefail
           repository=$(jq -r .repository "environments/$ENVIRONMENT/environment.json")
           printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          # Published tags are never moved. Only the registry's own not-found means absent.
-          if found=$(docker buildx imagetools inspect "$repository:$RELEASE" 2>&1); then
-            echo "::error::$repository:$RELEASE is already published; it is never replaced." && exit 1
-          elif [[ $found != *"not found"* ]]; then
-            echo "::error::Cannot establish that $repository:$RELEASE is unpublished: $found" && exit 1
+          # Releases are never replaced. GHCR denies inspecting a package that does not exist yet, so any
+          # inspect failure counts as absent; a real authorization problem fails the push instead.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 \
+            || docker buildx imagetools inspect "$repository:$RELEASE" > /dev/null 2>&1; then
+            echo "::error::$GITHUB_REF_NAME is already published; it is never replaced." && exit 1
           fi
           docker tag "$IMAGE" "$repository:$RELEASE"
           docker push --quiet "$repository:$RELEASE"
@@ -92,6 +91,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" manifest.json qualification.log --verify-tag \
+          gh release create "$GITHUB_REF_NAME" manifest.json qualification.log --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "$GITHUB_REF_NAME" \
             --notes "Image $(jq -r '.image.repository + "@" + .image.digest' manifest.json). Publication adopts and deploys nothing; see manifest.json."
