@@ -3,7 +3,6 @@
   "image": { "repository": "ghcr.io/faviann/zeroshot-environments/dotnet" },
   "platform": "linux/amd64",
   "base": {
-    "reference": "ghcr.io/the-open-engine/zeroshot-target:10.10.0@sha256:9769f74865d7e1137b82c9ed2ced4cbedb56cfd5fef6c9e8c0647955ba0c438b",
     "revision": "3ee1192cec359a0b997f464e703a936e8b67d63c"
   },
   "native": {

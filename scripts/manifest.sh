@@ -12,12 +12,14 @@ in_image() {
 }
 sha256() { in_image sha256sum "$1" | cut -d ' ' -f 1; }
 version() { grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1; }  # first x.y.z in a --version output
-# The Dockerfile's ADD URL is the only record of the entrypoint's Broodling commit.
+# The Dockerfile is the only record of the base reference and of the entrypoint's Broodling commit.
+base_reference=$(sed -n 's/^FROM \([^ ]*\).*/\1/p' "$dir/Dockerfile")
 entrypoint_url=$(grep -oE 'https://raw\.githubusercontent\.com/faviann/broodling/[0-9a-f]{40}/[^ ]+' "$dir/Dockerfile")
 entrypoint_source=${entrypoint_url#https://raw.githubusercontent.com/faviann/broodling/}
 
 observed=$(jq -n \
   --arg platform "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image")" \
+  --arg baseReference "$base_reference" \
   --arg recipeRevision "$(git rev-parse HEAD)" --arg recipePath "$dir" \
   --arg os "$(in_image sh -c '. /etc/os-release && echo "$PRETTY_NAME"')" \
   --arg nativeVersion "$(in_image zeroshot --version | version)" \
@@ -40,6 +42,7 @@ observed=$(jq -n \
     recipe: {repository: "https://github.com/faviann/zeroshot-environments", revision: $recipeRevision, path: $recipePath},
     platform: $platform,
     os: $os,
+    base: {reference: $baseReference},
     native: {
       version: $nativeVersion,
       zeroshot: {sha256: $zeroshotSha256},
@@ -63,6 +66,9 @@ problems=$(jq -r -n --slurpfile expected "$dir/environment.json" --argjson manif
   $expected[0] | (paths(type != "object") | select(all(.[]; type == "string"))) as $path
   | select(($manifest | getpath($path)) != getpath($path))
   | "\($path | map(tostring) | join(".")): image has \($manifest | getpath($path) | tojson), expected \(getpath($path) | tojson)"')
+if jq -e '.nativeStateTransitions.from | length > 0' "$dir/environment.json" > /dev/null; then
+  problems=${problems:+$problems$'\n'}"nativeStateTransitions.from: add transition qualification to qualify.sh before advertising a source"
+fi
 if [[ -n $problems ]]; then
   printf 'Manifest check failed:\n%s\n' "$problems" >&2
   exit 1

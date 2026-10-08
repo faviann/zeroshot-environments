@@ -36,7 +36,9 @@ jobs:
       - name: Determine the release
         run: |
           if [[ $PUBLISH == true ]]; then
-            echo "RELEASE=${GITHUB_REF_NAME#dotnet-}" >> "$GITHUB_ENV"
+            [[ $GITHUB_REF_NAME =~ ^$ENVIRONMENT-r([1-9][0-9]*)$ ]] \
+              || { echo "::error::$GITHUB_REF_NAME is not a $ENVIRONMENT-r<N> release tag"; exit 1; }
+            echo "RELEASE=r${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
           else
             echo RELEASE=unreleased >> "$GITHUB_ENV"
           fi
