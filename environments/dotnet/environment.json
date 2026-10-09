@@ -1,0 +1,25 @@
+{
+  "environment": { "name": "dotnet" },
+  "image": { "repository": "ghcr.io/faviann/zeroshot-environments/dotnet" },
+  "platform": "linux/amd64",
+  "base": {
+    "revision": "3ee1192cec359a0b997f464e703a936e8b67d63c"
+  },
+  "native": {
+    "version": "10.10.0",
+    "zeroshot": { "path": "/usr/local/bin/zeroshot", "sha256": "fd5ffef2d825d9035b3956b0026911a22e2c1b56f7fa205dd00310cfe88aeff5" },
+    "restic": { "path": "/usr/local/bin/restic", "version": "0.19.1", "sha256": "90ab22a5e731063c27590e704e8da2f4d9bae59a67899bd45d0904afc868a8cf" }
+  },
+  "integration": {
+    "broodling-entrypoint": {
+      "path": "/usr/local/bin/broodling-target",
+      "sha256": "76c526fe8c51be094dbc48527c40181f5b0f23069996f3c4315c456a49107b79"
+    }
+  },
+  "dotnet": {
+    "sdks": ["10.0.401"],
+    "runtimes": ["Microsoft.AspNetCore.App 10.0.12", "Microsoft.NETCore.App 10.0.12"]
+  },
+  "harnesses": { "codex": "0.155.0", "claude": "2.1.276", "copilot": "1.0.86" },
+  "nativeStateTransitions": { "from": [] }
+}
