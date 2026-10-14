@@ -30,8 +30,12 @@ RUN dpkg --install /tmp/libicu76.deb \
     && dotnet --info > /dev/null
 
 # Caches and first-run state stay under each run's own HOME: no shared NUGET_PACKAGES or DOTNET_CLI_HOME.
+# The harnesses stay at their manifest versions: Claude Code skips its updater when DISABLE_AUTOUPDATER
+# is set, and Copilot CLI when COPILOT_AUTO_UPDATE is "false" (both read so in the installed code).
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_NOLOGO=1 \
+    DISABLE_AUTOUPDATER=1 \
+    COPILOT_AUTO_UPDATE=false \
     HOME=/home/node \
     CODEX_HOME=/home/node/.codex
 WORKDIR /home/node

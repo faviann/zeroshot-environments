@@ -10,6 +10,15 @@
     "zeroshot": { "path": "/usr/local/bin/zeroshot", "sha256": "fd5ffef2d825d9035b3956b0026911a22e2c1b56f7fa205dd00310cfe88aeff5" },
     "restic": { "path": "/usr/local/bin/restic", "version": "0.19.1", "sha256": "90ab22a5e731063c27590e704e8da2f4d9bae59a67899bd45d0904afc868a8cf" }
   },
+  "startupInterfaces": {
+    "entrypoint": {
+      "version": "zeroshot-environment.direct-target-startup/v1",
+      "command": ["/usr/local/bin/broodling-target"]
+    },
+    "native": {
+      "discovery": { "kind": "zeroshot.native-v2-target/v2", "authentication": "private_capability" }
+    }
+  },
   "integration": {
     "broodling-entrypoint": {
       "path": "/usr/local/bin/broodling-target",
@@ -20,6 +29,29 @@
     "sdks": ["10.0.401"],
     "runtimes": ["Microsoft.AspNetCore.App 10.0.12", "Microsoft.NETCore.App 10.0.12"]
   },
-  "harnesses": { "codex": "0.155.0", "claude": "2.1.276", "copilot": "1.0.86" },
+  "harnesses": {
+    "codex": {
+      "version": "0.155.0",
+      "artifacts": {
+        "@openai/codex@0.155.0": { "integrity": "sha512-35a85Hbwy9WXkDTJumLjTcmMgpR7BMdrTloWBVGjoA+FBCh7jb3+cYp2W+3U4klqGAjAskoIvQZv7/eedmCjHA==" },
+        "@openai/codex@0.155.0-linux-x64": { "integrity": "sha512-CiXkVTy4ERdFSXXP8n98/iOyVUCOYFPQ8cuwgeOEEbLhe1LnlQbgH/H8ZeuxO9WXKIZLJg0x626UgR9axY2zSA==" }
+      }
+    },
+    "claude": {
+      "version": "2.1.276",
+      "artifacts": {
+        "@anthropic-ai/claude-code@2.1.276": { "integrity": "sha512-xgVXCbFdqOhSAcMTSC61gjL1jCQuoAA4TNU1I7Dmf/yuYcDxHf796r6LaB3Jswm1floKnP1V+/zfphtDlPdlkg==" },
+        "@anthropic-ai/claude-code-linux-x64@2.1.276": { "integrity": "sha512-xFhD9UyIVKWLEQjcFg1ynSmYPpiXSdyN9+9rtrM0aIVnSqFP15Hd5/owEf7N6JrHtAXijfxDC0usXFxAOJQ1vA==" }
+      }
+    },
+    "copilot": {
+      "version": "1.0.86",
+      "artifacts": {
+        "@github/copilot@1.0.86": { "integrity": "sha512-ytl6vkox1l6Y+UqLhX0+SOuTkS84VCp8R2CJqzgJ8QfnOlWe3U6z1ZVRm/sYWGMLchWQpnC7d+wWZ1mTUTFuuQ==" },
+        "@github/copilot-linux-x64@1.0.86": { "integrity": "sha512-ROyWMEP8nKFoa+7l2majzfgA5jaqid0qEYTClf9oooS+8S6CIhKYlW1VO6Lt3lDicoCI1S2RWbR7vJ6ZQy/TFw==" },
+        "detect-libc@2.1.2": { "integrity": "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==" }
+      }
+    }
+  },
   "nativeStateTransitions": { "from": [] }
 }
