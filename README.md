@@ -36,6 +36,9 @@ consumer's dispatch path. They never appear in the image, its history or a manif
 - **`/home/node`:** the base ships skeleton files there. The image empties it (root-owned, `0700`),
   because initialization requires an empty home. Without this, Docker would copy those files into a
   new named volume mounted at `/home/node`.
+- **Harness updates:** the image sets `DISABLE_AUTOUPDATER=1` for Claude Code and
+  `COPILOT_AUTO_UPDATE=false` for Copilot CLI, so neither replaces itself with a version the
+  manifest does not record. They reach only processes that inherit the container's environment.
 - **Unused volume:** the base declares `VOLUME /var/lib/zeroshot`. A derived image cannot remove
   it, so every container gets an anonymous volume there. Nothing uses it, so remove it with the
   container (`docker rm -v`).
