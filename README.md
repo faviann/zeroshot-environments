@@ -50,16 +50,16 @@ The image has two startup interfaces, and the manifest names a version for each 
 `startupInterfaces`:
 
 - **`entrypoint`:** `zeroshot-environment.direct-target-startup/v1`, the container interface below.
-  This repository assigns the version; it has no other source. A new entrypoint revision that keeps
-  every part of the interface keeps the version. A change to any part gets a new version.
+  Broodling owns this interface and its version value. The manifest records it for the embedded
+  entrypoint at `4bd7abb`.
 - **`native`:** the discovery document that native serves at `/.well-known/zeroshot-native-v2`
   once the entrypoint has started it. Its `kind`, `zeroshot.native-v2-target/v2`, is native's own
   protocol version, and `authentication` is `private_capability`. The extension kinds are native's
   too. The manifest records the document as native serves it.
 
-The entrypoint's interface is Broodling's, documented in its
-[deployment guide at `4bd7abb`](https://github.com/faviann/broodling/blob/4bd7abbe308f94ff401196921ef1891f6b414edc/deployment/README.md#explicit-initialization-and-guarded-startup).
-Version `v1` consists of these fixed parts:
+The parts below summarize Broodling's
+[deployment guide at `4bd7abb`](https://github.com/faviann/broodling/blob/4bd7abbe308f94ff401196921ef1891f6b414edc/deployment/README.md#explicit-initialization-and-guarded-startup),
+which is authoritative:
 
 - **Paths:** state at `/state` and home at `/home/node`, with `CODEX_HOME=/home/node/.codex`.
 - **Listener:** `0.0.0.0:18770`.
@@ -99,7 +99,8 @@ component checksums. The fields are:
 - **`image`:** the `repository`, `tag` and the `digest` that the publishing push produced.
 - **`recipe`:** this repository, the `revision` built and the recipe `path`.
 - **`platform`, `os`:** the target platform and the OS release.
-- **`base`:** the pinned `reference`, its `digest` and its `revision` label.
+- **`base`:** the pinned `reference`, its `digest`, and its `revision`, read from the base's
+  `org.opencontainers.image.revision` label.
 - **`native`:** the `version`, the `sourceRevision`, and the path and SHA-256 of `zeroshot` and of
   `restic`, plus restic's `version`.
 - **`startupInterfaces`:** the `entrypoint` interface `version` and the image's `command`, and the
@@ -108,8 +109,8 @@ component checksums. The fields are:
   SHA-256. Today that is only `broodling-entrypoint`.
 - **`dotnet`:** the installed `sdks` and `runtimes`.
 - **`harnesses`:** the `codex`, `claude` and `copilot` versions, each with its npm packages.
-- **`tools`:** node, python, rust, gcc, git, gh and docker-cli, each with its version as the tool
-  reports it.
+- **`tools`:** node, harness-node, npm, yarn, corepack, python, pip, rust, rustup,
+  rust-components, gcc, git, gh and docker-cli, each with its version as the tool reports it.
 - **`osPackages`:** every installed Debian package, read from dpkg (name, version, architecture).
 - **`nativeStateTransitions.from`:** the published images whose native state this release was
   qualified to serve.
@@ -133,25 +134,26 @@ exact version and a `fixedBy` value, which says what fixes its bytes:
 | `broodling-entrypoint` | `artifacts` | The script's SHA-256, which `ADD --checksum` verifies during the build. |
 | Codex, Claude Code, Copilot CLI | `artifacts` | Each npm package's `integrity`. The base installed them, and npm checked those values then. `manifest.sh` downloads each tarball again, requires the declared `integrity`, and requires the installed files to be the tarball's files. |
 | `native` (`zeroshot`, `restic`) | `base` | The base digest. The executables' SHA-256 values identify them and are asserted, but they are build outputs with no published checksum. |
-| Tools | `base` | The base digest. |
+| Tools: node, the harness interpreter copy at `/opt/zeroshot/bin/node`, npm, yarn, corepack, python, pip, rust, rustup, the installed Rust components, gcc, git, gh, docker-cli | `base` | The base digest. |
 | Other OS packages | `base` | The base digest. |
 
-The base's OS packages have no per-package checksum in the manifest. The base deletes its apt
-indexes and keeps no `.deb` files. A checksum from today's archive would describe a download, not
-the installed files, and versions that the base upgraded to may since have left the archive. The
-base digest fixes those packages, and `manifest.sh` checks that each one is the base's.
+The base digest encloses the base's OS packages and tools. Upstream publishes per-artifact
+checksums for them, for example the `.deb` SHA-256 values in the Debian archive, which
+snapshot.debian.org keeps. The manifest does not record those checksums. `manifest.sh` checks that
+each OS package and tool is the base's.
 
 [`environment.json`](environments/dotnet/environment.json) is the declared subset of the manifest.
 [`scripts/manifest.sh`](scripts/manifest.sh) asserts each declared value against the image, except
-the identity, the approved base revision, the entrypoint interface version, the measured paths and
-the transitions. It records everything else from the image. It also fails in these cases:
+the identity, the entrypoint interface version, the measured paths and the transitions. The base
+revision is asserted against the base's label. It records everything else from the image. It also fails in these cases:
 
 - An `ADD` in the Dockerfile has no checksum, or a downloaded artifact belongs to no component.
 - The base's layers are not the image's first layers.
-- `native` or `tools` read differently in the base.
+- `native`, `tools` or the content and links of the Rust toolchain at `/opt/rustup` read
+  differently in the base.
 - An OS package is neither the base's, with the same version, nor a recipe `.deb`.
 - An installed harness npm package is not declared in `environment.json`, or its files differ from
-  its published tarball.
+  its published tarball, or it contains links or special files. File modes are not compared.
 
 The harness check downloads about 345 MB of npm tarballs, so `manifest.sh` needs network access to
 the npm registry and to pull the base.

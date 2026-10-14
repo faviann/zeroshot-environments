@@ -54,15 +54,21 @@ if ! jq -e -n --argjson base "$(docker image inspect --format '{{json .RootFS.La
   problem "base: the image does not start with the layers of $base"
 fi
 # What the manifest attributes to the base. It must read the same in the image as in the base.
+# The Rust toolchain tree is compared by content and links; the recipe changes only its modes.
 base_facts() {
   run_in "$1" sh -c 'printf "native %s\nzeroshot %s\nrestic %s\nresticSha256 %s\n" \
       "$("$0" --version)" "$(sha256sum "$0" | cut -d " " -f 1)" "$("$1" version)" "$(sha256sum "$1" | cut -d " " -f 1)"
-    printf "node %s\npython %s\nrust %s\ngcc %s\ngit %s\ngh %s\ndocker-cli %s\n" \
-      "$(node --version)" "$(python3 --version)" "$(rustc --version)" "$(gcc -dumpfullversion)" \
-      "$(git --version)" "$(gh --version | head -n 1)" "$(docker --version)"' "$zeroshot" "$restic"
+    printf "rustupTree %s\n" "$(cd /opt/rustup && { find . -type f -exec sha256sum {} +; \
+      find . -type l -exec sh -c "for l; do echo \"\$l -> \$(readlink \"\$l\")\"; done" sh {} +; } | sort | sha256sum)"
+    printf "node %s\nharness-node %s\nnpm %s\nyarn %s\ncorepack %s\npython %s\npip %s\n" \
+      "$(node --version)" "$(/opt/zeroshot/bin/node --version)" "$(npm --version)" "$(yarn --version)" \
+      "$(corepack --version)" "$(python3 --version)" "$(pip --version | cut -d " " -f 1,2)"
+    printf "rust %s\nrustup %s\nrust-components %s\ngcc %s\ngit %s\ngh %s\ndocker-cli %s\n" \
+      "$(rustc --version)" "$(rustup --version 2> /dev/null)" "$(rustup default | cut -d " " -f 1): $(rustup component list --installed | paste -sd " ")" \
+      "$(gcc -dumpfullversion)" "$(git --version)" "$(gh --version | head -n 1)" "$(docker --version)"' "$zeroshot" "$restic"
 }
 facts=$(base_facts "$image")
-[[ $facts == "$(base_facts "$base")" ]] || problem "base: native or tool versions differ from the base's"
+[[ $facts == "$(base_facts "$base")" ]] || problem "base: native, the Rust toolchain or tool versions differ from the base's"
 fact() { sed -n "s/^$1 //p" <<< "$facts"; }
 packages() { run_in "$1" dpkg-query -W -f '${Package}\t${Version}\t${Architecture}\n'; }
 
@@ -127,6 +133,8 @@ if [[ -s $scratch/unpacked.tsv ]]; then
       diff <(cd "$unpacked" && find . -type f | sort) \
         <(cd "$installed" && find . -path ./node_modules -prune -o -type f -print | sort) > /dev/null \
         || { echo "$name: installed files differ from its tarball"; continue; }
+      [[ -z $(find "$installed" -path "$installed/node_modules" -prune -o ! -type f ! -type d -print) ]] \
+        || echo "$name: installed links or special files are not in its tarball"
       while IFS= read -r -d "" file; do
         count=$((count + 1))
         source=$unpacked/$file
@@ -143,6 +151,7 @@ fi
 observed=$(jq -n \
   --arg platform "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image")" \
   --arg baseReference "$base_reference" --arg baseDigest "$base_digest" \
+  --arg baseRevision "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$base")" \
   --arg recipeRevision "$(git rev-parse HEAD)" --arg recipePath "$dir" \
   --arg os "$(in_image sh -c '. /etc/os-release && echo "$PRETTY_NAME"')" \
   --arg nativeVersion "$(fact native | version)" \
@@ -169,7 +178,7 @@ observed=$(jq -n \
     recipe: {repository: "https://github.com/faviann/zeroshot-environments", revision: $recipeRevision, path: $recipePath},
     platform: $platform,
     os: $os,
-    base: {reference: $baseReference, digest: $baseDigest},
+    base: {reference: $baseReference, digest: $baseDigest, revision: $baseRevision},
     native: {
       version: $nativeVersion,
       zeroshot: {sha256: $zeroshotSha256},
@@ -206,11 +215,10 @@ manifest=$(jq -n --slurpfile expected "$declared" --argjson observed "$observed"
   {schema: "zeroshot-environment.manifest/v2", environment: {release: null}, image: {tag: null, digest: null}}
   * $expected[0] * $observed | .native.sourceRevision = .base.revision')
 # Every declared leaf (arrays compare whole) must equal what the image shows, except the declarations
-# themselves: identity, the approved base revision, the entrypoint's interface version, the paths that
-# get measured, and transitions.
+# themselves: identity, the entrypoint's interface version, the paths that get measured, and transitions.
 jq -r -n --slurpfile expected "$declared" --argjson observed "$observed" '
   $expected[0] | (paths(type != "object") | select(all(.[]; type == "string"))) as $path
-  | select(($path | IN(["environment", "name"], ["image", "repository"], ["base", "revision"],
+  | select(($path | IN(["environment", "name"], ["image", "repository"],
       ["startupInterfaces", "entrypoint", "version"], ["nativeStateTransitions", "from"])) or $path[-1] == "path" | not)
   | ($path | join(".")) as $name | ($observed | try getpath($path) catch null) as $actual
   | if $actual == null then "\($name): declared but not measured from the image"
