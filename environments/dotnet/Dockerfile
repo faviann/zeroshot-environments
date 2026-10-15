@@ -1,8 +1,8 @@
-# The .NET environment: stock Zeroshot target 10.10.0 plus the .NET SDK and Broodling's target
+# The .NET environment: stock Zeroshot target 10.12.0 plus the .NET SDK and Broodling's target
 # entrypoint. Every input is pinned by checksum or digest; the base is used as published, not rebuilt.
 # Build with this directory as context:
 #   docker build -t zeroshot-env-dotnet:local environments/dotnet
-FROM ghcr.io/the-open-engine/zeroshot-target:10.10.0@sha256:9769f74865d7e1137b82c9ed2ced4cbedb56cfd5fef6c9e8c0647955ba0c438b
+FROM ghcr.io/the-open-engine/zeroshot-target:10.12.0@sha256:9eca152ead38e6589b76b13cca802ce2e7538579b851566a891ed470b069bd51
 
 # .NET SDK 10.0.401. ADD verifies sha256 only; these bytes match the sha512 Microsoft publishes in its
 # 10.0 releases.json (51c8b999af9e8dd9…ba90311fbce25b), checked when pinned.
@@ -23,8 +23,6 @@ RUN dpkg --install /tmp/libicu76.deb \
     && ln -s /usr/share/dotnet/dotnet /usr/local/bin/dotnet \
     && echo /usr/share/dotnet > /etc/dotnet/install_location \
     && rm /tmp/dotnet-sdk.tar.gz /tmp/libicu76.deb \
-    # The base leaves its Rust toolchain world-writable; agents must not modify shared tools.
-    && find /opt/rustup -perm /022 ! -type l -exec chmod go-w {} + \
     # Initialization requires an empty home; Docker would copy the base's skeleton files into a volume.
     && rm -rf /home/node && install -d -m 0700 /home/node \
     && dotnet --info > /dev/null

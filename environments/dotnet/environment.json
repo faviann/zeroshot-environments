@@ -3,11 +3,11 @@
   "image": { "repository": "ghcr.io/faviann/zeroshot-environments/dotnet" },
   "platform": "linux/amd64",
   "base": {
-    "revision": "3ee1192cec359a0b997f464e703a936e8b67d63c"
+    "revision": "928de8ff918488749ca9d23e0a7349873401b7f7"
   },
   "native": {
-    "version": "10.10.0",
-    "zeroshot": { "path": "/usr/local/bin/zeroshot", "sha256": "fd5ffef2d825d9035b3956b0026911a22e2c1b56f7fa205dd00310cfe88aeff5" },
+    "version": "10.12.0",
+    "zeroshot": { "path": "/usr/local/bin/zeroshot", "sha256": "7b3c74db2c4ce06d2b483813a05c6b5928f81b10c471366d677ec25371b52693" },
     "restic": { "path": "/usr/local/bin/restic", "version": "0.19.1", "sha256": "90ab22a5e731063c27590e704e8da2f4d9bae59a67899bd45d0904afc868a8cf" }
   },
   "startupInterfaces": {

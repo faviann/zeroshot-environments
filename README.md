@@ -20,7 +20,7 @@ tag.
 
 ## The `dotnet` environment
 
-The image is built on upstream's published target image for stock native 10.10.0, used as published
+The image is built on upstream's published target image for stock native 10.12.0, used as published
 and pinned by digest. It adds the .NET SDK and Broodling's target entrypoint, which replaces the
 base's entrypoint and command. Everything the base ships stays as shipped and is listed in the
 manifest. Having a tool installed authorizes nothing. No Docker socket or daemon is provided.
@@ -31,8 +31,6 @@ consumer's dispatch path. They never appear in the image, its history or a manif
 
 ### Deviations from the base
 
-- **`/opt/rustup`:** the base leaves its Rust toolchain world-writable, including `rustc`. The
-  image removes group and other write permission, so agents cannot modify a shared tool.
 - **`/home/node`:** the base ships skeleton files there. The image empties it (root-owned, `0700`),
   because initialization requires an empty home. Without this, Docker would copy those files into a
   new named volume mounted at `/home/node`.
@@ -42,10 +40,6 @@ consumer's dispatch path. They never appear in the image, its history or a manif
 - **Unused volume:** the base declares `VOLUME /var/lib/zeroshot`. A derived image cannot remove
   it, so every container gets an anonymous volume there. Nothing uses it, so remove it with the
   container (`docker rm -v`).
-- **Broodling's `check-target`:** at `4bd7abb`, it pins Codex 0.153.4 and the release-archive
-  `zeroshot` checksum (`d0c84ffb…`). It rejects this image until Broodling takes the native identity
-  from the adopted manifest ([#234](https://github.com/faviann/broodling/issues/234)). This image's
-  native is the base's source build, SHA-256 `fd5ffef2…`, with Codex 0.155.0.
 
 ### Target interface
 
