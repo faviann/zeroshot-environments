@@ -52,7 +52,7 @@ The image has two startup interfaces, and the manifest names a version for each 
 - **`native`:** the discovery document that native serves at `/.well-known/zeroshot-native-v2`
   once the entrypoint has started it. Its `kind`, `zeroshot.native-v2-target/v2`, is native's own
   protocol version, and `authentication` is `private_capability`. The extension kinds are native's
-  too. The manifest records the document as native serves it.
+  too, and the manifest declares each extension's `kind`. It records the document as native serves it.
 
 The parts below summarize Broodling's
 [deployment guide at `4bd7abb`](https://github.com/faviann/broodling/blob/4bd7abbe308f94ff401196921ef1891f6b414edc/deployment/README.md#explicit-initialization-and-guarded-startup),

@@ -16,7 +16,16 @@
       "command": ["/usr/local/bin/broodling-target"]
     },
     "native": {
-      "discovery": { "kind": "zeroshot.native-v2-target/v2", "authentication": "private_capability" }
+      "discovery": {
+        "kind": "zeroshot.native-v2-target/v2",
+        "authentication": "private_capability",
+        "extensions": {
+          "workspace_recovery": { "kind": "openengine.workspace-recovery/v1" },
+          "workspace_checkpoints": { "kind": "openengine.workspace-checkpoints/v1" },
+          "node_runtime_lanes": { "kind": "openengine.node-runtime-lanes/v1" },
+          "git_transport": { "kind": "openengine.git-transport/v1" }
+        }
+      }
     }
   },
   "integration": {
