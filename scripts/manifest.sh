@@ -54,7 +54,7 @@ if ! jq -e -n --argjson base "$(docker image inspect --format '{{json .RootFS.La
   problem "base: the image does not start with the layers of $base"
 fi
 # What the manifest attributes to the base. It must read the same in the image as in the base.
-# The Rust toolchain tree is compared by content and links; the recipe changes only its modes.
+# The Rust toolchain tree is compared by content and links.
 base_facts() {
   run_in "$1" sh -c 'printf "native %s\nzeroshot %s\nrestic %s\nresticSha256 %s\n" \
       "$("$0" --version)" "$(sha256sum "$0" | cut -d " " -f 1)" "$("$1" version)" "$(sha256sum "$1" | cut -d " " -f 1)"

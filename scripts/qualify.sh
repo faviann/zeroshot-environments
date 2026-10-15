@@ -105,6 +105,11 @@ docker run --rm --label "$run" --network none --read-only --tmpfs /tmp:exec --us
   node -e ""
   cargo --version > /dev/null
   gh --version > /dev/null
+  # Native resolves the hosted identity for contained SSH Git with nss_wrapper, not the image user database.
+  printf "zeroshot:x:%s:%s:Zeroshot Git:/nonexistent:/usr/sbin/nologin\n" "$(id -u)" "$(id -g)" > "$TMPDIR/passwd"
+  printf "zeroshot:x:%s:\n" "$(id -g)" > "$TMPDIR/group"
+  LD_PRELOAD=/usr/local/lib/zeroshot/libnss_wrapper.so NSS_WRAPPER_PASSWD="$TMPDIR/passwd" \
+    NSS_WRAPPER_GROUP="$TMPDIR/group" ssh -V > /dev/null 2>&1
   for harness in codex claude copilot; do "$harness" --version > /dev/null 2>&1; done' \
   || fail 'tool invocation with run-local caches'
-pass "dotnet build/run, cc, git, python3, node, cargo, gh and harnesses ran as $agent with caches in its HOME"
+pass "dotnet build/run, cc, git, python3, node, cargo, gh, ssh (under nss_wrapper) and harnesses ran as $agent with caches in its HOME"
