@@ -193,9 +193,9 @@ observed=$(jq -n \
       sha256: $entrypointSha256
     } + artifact(. == ($entrypointPath | sub(".*/"; ""))))},
     dotnet: ({sdks: ($sdks | lines), runtimes: ($runtimes | lines)} + artifact(startswith("dotnet-sdk-"))),
-    harnesses: {codex: $codex, claude: $claude, copilot: $copilot}
+    harnesses: ({codex: $codex, claude: $claude, copilot: $copilot}
       | with_entries(.value = {version: .value, fixedBy: "artifacts", artifacts: ($npm[.key] // {})})
-      | .claude.managedSettings = {sha256: $managedSettingsSha256},
+      | .claude.managedSettings = {sha256: $managedSettingsSha256}),
     tools: ($tools | lines | map(capture("^(?<key>[^ ]+) (?<value>.*)$") | .value = {version: .value, fixedBy: "base"})
       | from_entries),
     osPackages: ($packages | lines | map(. as $line | split("\t") | {name: .[0], version: .[1], architecture: .[2]}
