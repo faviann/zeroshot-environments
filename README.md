@@ -21,9 +21,9 @@ tag.
 ## The `dotnet` environment
 
 The image is built on upstream's published target image for stock native 10.12.0, used as published
-and pinned by digest. It adds the .NET SDK and Broodling's target entrypoint, which replaces the
-base's entrypoint and command. Everything the base ships stays as shipped and is listed in the
-manifest. Having a tool installed authorizes nothing. No Docker socket or daemon is provided.
+and pinned by digest. It adds the .NET SDK, Claude Code's managed settings and Broodling's target
+entrypoint, which replaces the base's entrypoint and command. Everything the base ships stays as
+shipped and is listed in the manifest. Having a tool installed authorizes nothing. No Docker socket or daemon is provided.
 
 Broodling's build and test prerequisites are a .NET 10 SDK, git, `cc` with libc headers, and
 `python3` for its asset check. Package-read and other runtime credentials come through the
@@ -37,6 +37,14 @@ consumer's dispatch path. They never appear in the image, its history or a manif
 - **Harness updates:** the image sets `DISABLE_AUTOUPDATER=1` for Claude Code and
   `COPILOT_AUTO_UPDATE=false` for Copilot CLI, so neither replaces itself with a version the
   manifest does not record. They reach only processes that inherit the container's environment.
+- **Claude Code managed settings:** native's hosted Claude lane starts each agent with a cleared
+  environment, so the image's environment variables never reach a Claude Code agent. Claude Code
+  reads `/etc/claude-code/managed-settings.json` whatever its environment. The image installs
+  [`managed-settings.json`](environments/dotnet/managed-settings.json) there as one line of JSON and
+  a newline, owned by root with mode `0644`, in a root-owned `0755` directory. The settings turn off
+  nonessential traffic, remove the commit and pull request attribution, and allow only managed hooks
+  and managed MCP servers. The image declares no managed hook or MCP server. If Claude Code cannot
+  read the file, it says so only on stderr and runs without these policies.
 - **Unused volume:** the base declares `VOLUME /var/lib/zeroshot`. A derived image cannot remove
   it, so every container gets an anonymous volume there. Nothing uses it, so remove it with the
   container (`docker rm -v`).
