@@ -44,9 +44,11 @@ consumer's dispatch path. They never appear in the image, its history or a manif
   [`managed-settings.json`](environments/dotnet/managed-settings.json) there as one line of JSON and
   a newline, owned by root with mode `0644`, in a root-owned `0755` directory. The settings turn off
   nonessential traffic, remove the commit and pull request attribution, and allow only managed hooks
-  and managed MCP servers. The image declares no managed hook or MCP server. If the file is
-  missing, Claude Code runs without these policies and reports nothing. If it cannot read the file,
-  it reports that only on stderr.
+  and managed MCP servers. The image declares no managed hook or MCP server. The settings also set
+  every model call's effort to `medium` and its output limit to 32000 tokens, and a repository's own
+  settings cannot raise either. They skip WebFetch's domain check, a request to `api.anthropic.com`
+  that names the fetched domain. If the file is missing, Claude Code runs without these policies and
+  reports nothing. If it cannot read the file, it reports that only on stderr.
 - **Unused volume:** the base declares `VOLUME /var/lib/zeroshot`. A derived image cannot remove
   it, so every container gets an anonymous volume there. Nothing uses it, so remove it with the
   container (`docker rm -v`).
