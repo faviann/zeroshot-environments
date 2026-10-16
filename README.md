@@ -169,8 +169,10 @@ the npm registry and to pull the base.
 ## Qualification
 
 [`scripts/qualify.sh`](scripts/qualify.sh) checks the target's startup behaviour and the tools as
-agent UID 10002, with no network, provider or real credential. Restart is qualified only over the
-image's own fresh state. Before any image is listed in `nativeStateTransitions.from`, add
+agent UID 10002, with no network, provider or real credential. It checks that root owns the managed
+settings and their directory with modes `0644` and `0755`, and that UID 10002 reads the declared
+SHA-256. It then starts Claude Code as UID 10002 and fails if its stderr reports `Managed settings
+failed to load`. Restart is qualified only over the image's own fresh state. Before any image is listed in `nativeStateTransitions.from`, add
 transition checks like Broodling #125's: an update from that image's state to the new one. Broodling's
 adoption (#234) and repository validation (#236) separately establish SDK, workflow, build and test
 behaviour.
