@@ -47,8 +47,13 @@ consumer's dispatch path. They never appear in the image, its history or a manif
   and managed MCP servers. The image declares no managed hook or MCP server. The settings also set
   every model call's effort to `medium` and its output limit to 32000 tokens, and a repository's own
   settings cannot raise either. They skip WebFetch's domain check, a request to `api.anthropic.com`
-  that names the fetched domain. If the file is missing, Claude Code runs without these policies and
-  reports nothing. If it cannot read the file, it reports that only on stderr.
+  that names the fetched domain. They deny WebFetch and WebSearch, so neither tool is offered to an
+  agent or its subagents, even under `--dangerously-skip-permissions` or when a repository's settings
+  allow them. Each tool would otherwise make an extra model call. Native's hosted lane always passes
+  `--dangerously-skip-permissions`. Its local lane passes it only when no permission rule is
+  configured, so under this deny a local `zeroshot run` agent needs approval for commands such as
+  Bash and is refused. If the file is missing, Claude Code runs without these policies and reports
+  nothing. If it cannot read the file, it reports that only on stderr.
 - **Unused volume:** the base declares `VOLUME /var/lib/zeroshot`. A derived image cannot remove
   it, so every container gets an anonymous volume there. Nothing uses it, so remove it with the
   container (`docker rm -v`).
@@ -177,8 +182,9 @@ the npm registry and to pull the base.
 the first run's agent, UID `20000` with GID `10002`, with no network, provider or real credential.
 It checks that root owns the managed settings and their directory with modes `0644` and `0755`, and
 that the agent reads the declared SHA-256. It then starts Claude Code as the agent and fails if its
-stderr reports `Managed settings failed to load`. Restart is qualified only over the image's own
-fresh state. Before any image is listed in `nativeStateTransitions.from`, add
+stderr reports `Managed settings failed to load` or if the session offers WebFetch or WebSearch.
+Restart is qualified only over the image's own fresh state. Before any image is listed in
+`nativeStateTransitions.from`, add
 transition checks like Broodling #125's: an update from that image's state to the new one. Broodling's
 adoption (#234) and repository validation (#236) separately establish SDK, workflow, build and test
 behaviour.

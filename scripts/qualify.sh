@@ -138,6 +138,7 @@ output=$(docker run --rm --label "$run" --network none --read-only --tmpfs /tmp:
   mkdir -p "$HOME" && cd "$HOME"
   claude --print --output-format stream-json --verbose q > out 2> err
   head -n 1 out | grep -q "\"subtype\":\"init\"" || { echo "no session started"; cat err; exit 1; }
-  if grep -qF "Managed settings failed to load" err; then cat err; exit 1; fi' 2>&1) \
+  if grep -qF "Managed settings failed to load" err; then cat err; exit 1; fi
+  if head -n 1 out | grep -qE "\"Web(Fetch|Search)\""; then echo "WebFetch or WebSearch is offered"; exit 1; fi' 2>&1) \
   || fail "managed settings: Claude Code as $agent: $output"
-pass "managed settings: Claude Code as $agent started a session and reported no settings load failure"
+pass "managed settings: Claude Code as $agent started a session without WebFetch or WebSearch and reported no settings load failure"
