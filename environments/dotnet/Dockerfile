@@ -17,7 +17,7 @@ ADD --chmod=755 --checksum=sha256:76c526fe8c51be094dbc48527c40181f5b0f23069996f3
     /usr/local/bin/broodling-target
 
 RUN dpkg --install /tmp/libicu76.deb \
-    && install -d -m 0755 /usr/share/dotnet /etc/dotnet \
+    && install -d -m 0755 /usr/share/dotnet /etc/dotnet /etc/claude-code \
     && tar -xzf /tmp/dotnet-sdk.tar.gz -C /usr/share/dotnet --no-same-owner \
     && chmod -R go-w /usr/share/dotnet \
     && ln -s /usr/share/dotnet/dotnet /usr/local/bin/dotnet \
@@ -26,6 +26,9 @@ RUN dpkg --install /tmp/libicu76.deb \
     # Initialization requires an empty home; Docker would copy the base's skeleton files into a volume.
     && rm -rf /home/node && install -d -m 0700 /home/node \
     && dotnet --info > /dev/null
+# Claude Code's managed settings, which it reads even when native clears an agent's environment. COPY
+# would create a missing /etc/claude-code with the file's mode, 0644, which agents cannot traverse.
+COPY --chmod=0644 managed-settings.json /etc/claude-code/managed-settings.json
 
 # Caches and first-run state stay under each run's own HOME: no shared NUGET_PACKAGES or DOTNET_CLI_HOME.
 # The harnesses stay at their manifest versions: Claude Code skips its updater when DISABLE_AUTOUPDATER

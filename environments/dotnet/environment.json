@@ -48,6 +48,10 @@
     },
     "claude": {
       "version": "2.1.276",
+      "managedSettings": {
+        "path": "/etc/claude-code/managed-settings.json",
+        "sha256": "cbedfec6d9c688288255c084f95269b4198d86435dbb48953ca4e71dac961b0b"
+      },
       "artifacts": {
         "@anthropic-ai/claude-code@2.1.276": { "integrity": "sha512-xgVXCbFdqOhSAcMTSC61gjL1jCQuoAA4TNU1I7Dmf/yuYcDxHf796r6LaB3Jswm1floKnP1V+/zfphtDlPdlkg==" },
         "@anthropic-ai/claude-code-linux-x64@2.1.276": { "integrity": "sha512-xFhD9UyIVKWLEQjcFg1ynSmYPpiXSdyN9+9rtrM0aIVnSqFP15Hd5/owEf7N6JrHtAXijfxDC0usXFxAOJQ1vA==" }

@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # Qualifies a built environment image as a Broodling DirectTarget: initialization, startup refusals,
-# private mode and restart over its own state, then agent-UID checks of shared-tool immutability and
-# tool invocation with run-local caches. Disposable Docker volumes only; no network, provider or real
-# credential. Usage: scripts/qualify.sh IMAGE
+# private mode and restart over its own state, then agent-UID checks of shared-tool immutability,
+# tool invocation with run-local caches and Claude Code's managed settings. Disposable Docker volumes
+# only; no network, provider or real credential. Usage: scripts/qualify.sh IMAGE
 set -euo pipefail
 image=$1
 run=zsq-$$
 origin=http://127.0.0.1:18770
 serve_args=(--listen 0.0.0.0:18770 --public-origin "$origin" --storage /state)
-agent=10002:10002  # native's fixed hosted worker identity (HOSTED_WORKER_UID)
+# Native 10.12 runs each hosted agent as a per-run UID, 20000 for the first run, with GID 10002
+# (native 928de8ff zeroshot/src/execution/process.rs:254-258, process/tests.rs:68-80).
+agent=20000:10002
+declared=$(dirname "$0")/../environments/dotnet/environment.json
+settings=$(jq -r .harnesses.claude.managedSettings.path "$declared")
+settings_sha256=$(jq -r .harnesses.claude.managedSettings.sha256 "$declared")
 
 cleanup() {
   docker ps -aq --filter "label=$run" | xargs -r docker rm -f -v > /dev/null
@@ -113,3 +118,26 @@ docker run --rm --label "$run" --network none --read-only --tmpfs /tmp:exec --us
   for harness in codex claude copilot; do "$harness" --version > /dev/null 2>&1; done' \
   || fail 'tool invocation with run-local caches'
 pass "dotnet build/run, cc, git, python3, node, cargo, gh, ssh (under nss_wrapper) and harnesses ran as $agent with caches in its HOME"
+
+# Claude Code's managed settings, at the path and SHA-256 that environment.json declares. Claude Code
+# ignores a missing policy file silently and reports one it cannot read only on stderr and then runs without its policies, so the agent
+# UID must read the exact bytes and Claude Code, started as the agent UID, must start a session without
+# that report. Native passes a key; without one, Claude Code reports the failure in other words.
+modes=$(docker run --rm --label "$run" --network none --entrypoint stat "$image" -c '%u:%g %a' "${settings%/*}" "$settings" 2>&1 \
+  | paste -sd ' ') || fail "managed settings: cannot stat ${settings%/*} and $settings: $modes"
+[[ $modes == '0:0 755 0:0 644' ]] \
+  || fail "managed settings: ${settings%/*} and $settings are $modes, expected 0:0 755 and 0:0 644"
+pass "managed settings: ${settings%/*} is root's 0755 and $settings root's 0644"
+digest=$(docker run --rm --label "$run" --network none --user "$agent" --entrypoint sh "$image" -c "sha256sum < $settings" 2>&1) \
+  || fail "managed settings: $agent cannot read $settings: $digest"
+[[ ${digest%% *} == "$settings_sha256" ]] \
+  || fail "managed settings: $settings has SHA-256 ${digest%% *}, expected $settings_sha256"
+pass "managed settings: $agent reads $settings with SHA-256 $settings_sha256"
+output=$(docker run --rm --label "$run" --network none --read-only --tmpfs /tmp:exec --user "$agent" \
+  --env HOME=/tmp/run --env TMPDIR=/tmp/run --env CLAUDE_CODE_MAX_RETRIES=0 --env ANTHROPIC_API_KEY=placeholder --entrypoint bash "$image" -c '
+  mkdir -p "$HOME" && cd "$HOME"
+  claude --print --output-format stream-json --verbose q > out 2> err
+  head -n 1 out | grep -q "\"subtype\":\"init\"" || { echo "no session started"; cat err; exit 1; }
+  if grep -qF "Managed settings failed to load" err; then cat err; exit 1; fi' 2>&1) \
+  || fail "managed settings: Claude Code as $agent: $output"
+pass "managed settings: Claude Code as $agent started a session and reported no settings load failure"

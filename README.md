@@ -21,9 +21,10 @@ tag.
 ## The `dotnet` environment
 
 The image is built on upstream's published target image for stock native 10.12.0, used as published
-and pinned by digest. It adds the .NET SDK and Broodling's target entrypoint, which replaces the
-base's entrypoint and command. Everything the base ships stays as shipped and is listed in the
-manifest. Having a tool installed authorizes nothing. No Docker socket or daemon is provided.
+and pinned by digest. It adds the .NET SDK, Claude Code's managed settings and Broodling's target
+entrypoint, which replaces the base's entrypoint and command. Everything the base ships stays as
+shipped and is listed in the manifest. Having a tool installed authorizes nothing. No Docker socket
+or daemon is provided.
 
 Broodling's build and test prerequisites are a .NET 10 SDK, git, `cc` with libc headers, and
 `python3` for its asset check. Package-read and other runtime credentials come through the
@@ -37,6 +38,15 @@ consumer's dispatch path. They never appear in the image, its history or a manif
 - **Harness updates:** the image sets `DISABLE_AUTOUPDATER=1` for Claude Code and
   `COPILOT_AUTO_UPDATE=false` for Copilot CLI, so neither replaces itself with a version the
   manifest does not record. They reach only processes that inherit the container's environment.
+- **Claude Code managed settings:** native's hosted Claude lane starts each agent with a cleared
+  environment, so the image's environment variables never reach a Claude Code agent. Claude Code
+  reads `/etc/claude-code/managed-settings.json` whatever its environment. The image installs
+  [`managed-settings.json`](environments/dotnet/managed-settings.json) there as one line of JSON and
+  a newline, owned by root with mode `0644`, in a root-owned `0755` directory. The settings turn off
+  nonessential traffic, remove the commit and pull request attribution, and allow only managed hooks
+  and managed MCP servers. The image declares no managed hook or MCP server. If the file is
+  missing, Claude Code runs without these policies and reports nothing. If it cannot read the file,
+  it reports that only on stderr.
 - **Unused volume:** the base declares `VOLUME /var/lib/zeroshot`. A derived image cannot remove
   it, so every container gets an anonymous volume there. Nothing uses it, so remove it with the
   container (`docker rm -v`).
@@ -76,8 +86,9 @@ UID ownership.
 
 ### Runs on the target
 
-Native runs every agent as its fixed hosted identity, UID/GID `10002`. Each run gets its own `HOME`
-and `TMPDIR`, so .NET, NuGet, npm and Cargo caches stay with the run. `/tmp`, `/var/tmp` and
+Native 10.12 runs each run's agents as a per-run UID, `20000` for the first run, with GID `10002`
+(native `928de8ff`, `zeroshot/src/execution/process.rs:254-258` and `process/tests.rs:68-80`). Each
+run gets its own `HOME` and `TMPDIR`, so .NET, NuGet, npm and Cargo caches stay with the run. `/tmp`, `/var/tmp` and
 `/run/lock` remain shared, sticky directories. A tool that ignores `TMPDIR` can leave files there
 that other runs see: .NET, for example, keeps its IPC endpoints and build-server pipes under `/tmp`.
 For strict separation, the consumer should build with `--disable-build-servers`.
@@ -106,6 +117,9 @@ component checksums. The fields are:
   SHA-256. Today that is only `broodling-entrypoint`.
 - **`dotnet`:** the installed `sdks` and `runtimes`.
 - **`harnesses`:** the `codex`, `claude` and `copilot` versions, each with its npm packages.
+  `claude.managedSettings` has the path and SHA-256 of Claude Code's managed settings. It is not a
+  component. Its bytes are the recipe's `managed-settings.json`, and `environment.json` declares
+  its SHA-256.
 - **`tools`:** node, harness-node, npm, yarn, corepack, python, pip, rust, rustup,
   rust-components, gcc, git, gh and docker-cli, each with its version as the tool reports it.
 - **`osPackages`:** every installed Debian package, read from dpkg (name, version, architecture).
@@ -158,8 +172,11 @@ the npm registry and to pull the base.
 ## Qualification
 
 [`scripts/qualify.sh`](scripts/qualify.sh) checks the target's startup behaviour and the tools as
-agent UID 10002, with no network, provider or real credential. Restart is qualified only over the
-image's own fresh state. Before any image is listed in `nativeStateTransitions.from`, add
+the first run's agent, UID `20000` with GID `10002`, with no network, provider or real credential.
+It checks that root owns the managed settings and their directory with modes `0644` and `0755`, and
+that the agent reads the declared SHA-256. It then starts Claude Code as the agent and fails if its
+stderr reports `Managed settings failed to load`. Restart is qualified only over the image's own
+fresh state. Before any image is listed in `nativeStateTransitions.from`, add
 transition checks like Broodling #125's: an update from that image's state to the new one. Broodling's
 adoption (#234) and repository validation (#236) separately establish SDK, workflow, build and test
 behaviour.
