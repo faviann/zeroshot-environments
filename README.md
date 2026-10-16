@@ -114,6 +114,9 @@ component checksums. The fields are:
   SHA-256. Today that is only `broodling-entrypoint`.
 - **`dotnet`:** the installed `sdks` and `runtimes`.
 - **`harnesses`:** the `codex`, `claude` and `copilot` versions, each with its npm packages.
+  `claude.managedSettings` has the path and SHA-256 of Claude Code's managed settings. It is not a
+  component. Its bytes are the recipe's `managed-settings.json`, and `environment.json` declares
+  its SHA-256.
 - **`tools`:** node, harness-node, npm, yarn, corepack, python, pip, rust, rustup,
   rust-components, gcc, git, gh and docker-cli, each with its version as the tool reports it.
 - **`osPackages`:** every installed Debian package, read from dpkg (name, version, architecture).

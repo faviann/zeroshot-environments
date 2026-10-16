@@ -32,6 +32,7 @@ problem() { printf '%s\n' "$@" >> "$problems"; }
 zeroshot=$(jq -r .native.zeroshot.path "$declared")
 restic=$(jq -r .native.restic.path "$declared")
 entrypoint=$(jq -r '.integration["broodling-entrypoint"].path' "$declared")
+managed_settings=$(jq -r .harnesses.claude.managedSettings.path "$declared")
 base_reference=$(sed -n 's/^FROM \([^ ]*\).*/\1/p' "$dir/Dockerfile")
 base_digest=${base_reference#*@}
 base_repository=${base_reference%@*}
@@ -166,6 +167,7 @@ observed=$(jq -n \
   --arg runtimes "$(in_image dotnet --list-runtimes | cut -d ' ' -f 1,2)" \
   --arg codex "$(in_image codex --version 2> /dev/null | version)" \
   --arg claude "$(in_image claude --version | version)" \
+  --arg managedSettingsSha256 "$(in_image sha256sum "$managed_settings" | cut -d ' ' -f 1)" \
   --arg copilot "$(in_image copilot --version | version)" \
   --argjson npm "$npm" \
   --arg tools "$(sed -n '/^node /,$p' <<< "$facts")" \
@@ -192,7 +194,8 @@ observed=$(jq -n \
     } + artifact(. == ($entrypointPath | sub(".*/"; ""))))},
     dotnet: ({sdks: ($sdks | lines), runtimes: ($runtimes | lines)} + artifact(startswith("dotnet-sdk-"))),
     harnesses: {codex: $codex, claude: $claude, copilot: $copilot}
-      | with_entries(.value = {version: .value, fixedBy: "artifacts", artifacts: ($npm[.key] // {})}),
+      | with_entries(.value = {version: .value, fixedBy: "artifacts", artifacts: ($npm[.key] // {})})
+      | .claude.managedSettings = {sha256: $managedSettingsSha256},
     tools: ($tools | lines | map(capture("^(?<key>[^ ]+) (?<value>.*)$") | .value = {version: .value, fixedBy: "base"})
       | from_entries),
     osPackages: ($packages | lines | map(. as $line | split("\t") | {name: .[0], version: .[1], architecture: .[2]}
