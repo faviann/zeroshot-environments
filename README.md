@@ -47,6 +47,21 @@ consumer's dispatch path. They never appear in the image, its history or a manif
   and managed MCP servers. The image declares no managed hook or MCP server. The settings also set
   every model call's effort to `medium`, overriding any higher or lower `--effort` that native
   passes, and its output limit to 32000 tokens, and a repository's own settings cannot raise either.
+  They set `CLAUDE_CODE_EXTRA_BODY` to `{}`, so neither a repository's settings nor a settings file
+  that an agent writes during a run can add request fields such as a higher effort, a larger output
+  limit or `speed`. They allow only the model `claude-opus-5-5`. When a subagent or a
+  built-in agent such as `statusline-setup` asks for another model, Claude Code sends its calls to
+  `claude-opus-5-5` without telling the model. Only the stream output logs a warning. A session
+  started with `--model` naming any other model runs on Claude Code's default instead,
+  `claude-opus-5` with a 1M-token context. Native passes the model that the run's configuration
+  names, so that model must be `claude-opus-5-5`. A model name ending in `[1m]`, or a repository's
+  `ANTHROPIC_BETAS` setting, keeps calls on `claude-opus-5-5` at `medium` but adds the 1M-context
+  beta to them. The settings turn off the advisor tool, which would add calls to another model.
+  They turn off background tasks, so a subagent runs in the foreground and cannot make calls or
+  edits after the session's result, and `Bash` loses `run_in_background`. They turn off Workflows,
+  which would still run in the background after the result. This removes the `Workflow` tool and
+  the `deep-research` and `workflow-authoring` skills that depend on it. Neither native nor the
+  software-change execution asset uses them.
   They skip WebFetch's domain check, a request to `api.anthropic.com` that names the fetched domain.
   They deny WebFetch and WebSearch, so neither tool is offered to an agent or its subagents, even
   under `--dangerously-skip-permissions` or when a repository's settings allow them. Each tool would
@@ -186,8 +201,11 @@ the npm registry and to pull the base.
 the first run's agent, UID `20000` with GID `10002`, with no network, provider or real credential.
 It checks that root owns the managed settings and their directory with modes `0644` and `0755`, and
 that the agent reads the declared SHA-256. It then starts Claude Code as the agent with
-`--dangerously-skip-permissions`, as native's hosted lane starts it, and fails if its stderr reports
-`Managed settings failed to load` or if the session offers WebFetch or WebSearch.
+`--dangerously-skip-permissions`, as native's hosted lane starts it, and `--model haiku`. It fails if
+its stderr reports `Managed settings failed to load`, if the session offers WebFetch, WebSearch or
+Workflow, if Claude Code does not log that it refused Haiku, or if the session runs on Haiku. The
+other settings change only model requests and when tools run. The qualification run has no network,
+so it makes no model request, and the SHA-256 alone checks those settings.
 Restart is qualified only over the image's own fresh state. Before any image is listed in
 `nativeStateTransitions.from`, add
 transition checks like Broodling #125's: an update from that image's state to the new one. Broodling's
