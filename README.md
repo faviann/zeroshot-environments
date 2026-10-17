@@ -197,8 +197,10 @@ the npm registry and to pull the base.
 the first run's agent, UID `20000` with GID `10002`, with no network, provider or real credential.
 It checks that root owns the managed settings and their directory with modes `0644` and `0755`, and
 that the agent reads the declared SHA-256. It then starts Claude Code as the agent with
-`--dangerously-skip-permissions`, as native's hosted lane starts it, and fails if its stderr reports
-`Managed settings failed to load` or if the session offers WebFetch or WebSearch.
+`--dangerously-skip-permissions`, as native's hosted lane starts it, and `--model haiku`. It fails if
+its stderr reports `Managed settings failed to load`, if the session offers WebFetch or WebSearch,
+or if the session runs on Haiku. The other settings change only request bodies and when tools run,
+which a session without a model never shows, so the SHA-256 alone checks them.
 Restart is qualified only over the image's own fresh state. Before any image is listed in
 `nativeStateTransitions.from`, add
 transition checks like Broodling #125's: an update from that image's state to the new one. Broodling's
