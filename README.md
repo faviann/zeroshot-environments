@@ -47,6 +47,17 @@ consumer's dispatch path. They never appear in the image, its history or a manif
   and managed MCP servers. The image declares no managed hook or MCP server. The settings also set
   every model call's effort to `medium`, overriding any higher or lower `--effort` that native
   passes, and its output limit to 32000 tokens, and a repository's own settings cannot raise either.
+  They set `CLAUDE_CODE_EXTRA_BODY` to `{}`, so neither a repository's settings nor a settings file
+  that an agent writes during a run can add request fields such as a higher effort, a larger output
+  limit or `speed`. They allow only the model `claude-opus-5-5`. When a subagent, a Workflow agent or
+  a built-in agent such as `statusline-setup` asks for another model, Claude Code sends its calls to
+  `claude-opus-5-5` and reports nothing. A session started with `--model` naming any other model
+  runs on Claude Code's default instead, `claude-opus-5` with a 1M-token context. Native passes the
+  model that the run's configuration names, so that model must be `claude-opus-5-5`. The settings
+  turn off the advisor tool, which would add calls to another model. They turn off background
+  tasks, so a subagent runs in the foreground and cannot make calls or edits after the session's
+  result, and `Bash` loses `run_in_background`. A Workflow still runs in the background. One that
+  outlives the session's result makes two more calls and its edits after that result.
   They skip WebFetch's domain check, a request to `api.anthropic.com` that names the fetched domain.
   They deny WebFetch and WebSearch, so neither tool is offered to an agent or its subagents, even
   under `--dangerously-skip-permissions` or when a repository's settings allow them. Each tool would
