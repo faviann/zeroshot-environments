@@ -50,7 +50,7 @@
       "version": "2.1.276",
       "managedSettings": {
         "path": "/etc/claude-code/managed-settings.json",
-        "sha256": "9e66777d34de805728e347cd7e12a390a279db28a9366774c10dee71bd432189"
+        "sha256": "a469a57a1f61686f006df05d41973208f0bd9f81de219db17f4034882b038f2e"
       },
       "artifacts": {
         "@anthropic-ai/claude-code@2.1.276": { "integrity": "sha512-xgVXCbFdqOhSAcMTSC61gjL1jCQuoAA4TNU1I7Dmf/yuYcDxHf796r6LaB3Jswm1floKnP1V+/zfphtDlPdlkg==" },
